@@ -21,6 +21,7 @@
 
 int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int filesLeft);
 int assingTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd);
+int worksProcessed(char * buffer);
 
 typedef struct slave_t
 {
