@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 
 #define SLAVE "./slave"
 #define MAX_SLAVES 5
@@ -19,10 +20,6 @@
   } \
 } while (0)
 
-int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int filesLeft);
-int assingTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd);
-int worksProcessed(char * buffer);
-
 typedef struct slave_t
 {
     pid_t pid;
@@ -30,6 +27,11 @@ typedef struct slave_t
     int fdOut;
     int pending;
 } slave_t;
+
+int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int filesLeft);
+int assignTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd);
+int worksProcessed(char * buffer);
+
 
 
 int main(int argc, char const *argv[])
@@ -41,7 +43,7 @@ int main(int argc, char const *argv[])
     int filesLeft = argc-1;
     int filesRead = 0, fdsAvailable = 0;
     int bytesRead=0;
-    char * taskRemaining[] = argv+1; //salteo el primer argumento que es el ejecutable
+    char ** taskRemaining = argv; //salteo el primer argumento que es el ejecutable
     slave_t children[MAX_SLAVES];
     createChildren(children,taskRemaining,&filesRead,filesLeft);
     
@@ -61,10 +63,11 @@ int main(int argc, char const *argv[])
         {
             if (FD_ISSET(children[i].fdOut, &fdSet)){
                ERROR_CHECK(bytesRead+=read(children[i].fdOut,buffer,MAX_BUFFER_SIZE));// Leer los outputs del slave 
-               worksProcessed(buffer);// Ver cuantas tareas hizo
+               printf("%s\n",buffer);
+               //worksProcessed(buffer);// Ver cuantas tareas hizo
                 // Mandarle tantas tareas como las que ya realizo
                 // Escribir lo que devolvio el hijo en el archivo de salida para view
-                fdsAvailable--;
+                //fdsAvailable--;
             }
         }
         
@@ -83,9 +86,13 @@ int main(int argc, char const *argv[])
 
 int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int filesLeft){
     
-    int id,aux;
-    char *arg[2] = {SLAVE,(char*)NULL};
+    int id,aux, pendings=1;
+    char *arg[2]={SLAVE,(char*)NULL};
     
+    if(filesLeft < MAX_SLAVES*2){
+        pendings = 2;
+    }
+
     for(int i = 0 ; i < MAX_SLAVES && *filesRead < filesLeft ; i++){
         
         int pipeMtoS[2];
@@ -109,7 +116,7 @@ int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int
             ERROR_CHECK(dup2(pipeStoM[PIPE_WRITE],STDOUT_FILENO));
             ERROR_CHECK(close(pipeMtoS[PIPE_READ]));
             ERROR_CHECK(close(pipeStoM[PIPE_WRITE]));
-            assignTask(taskRemaining,PEND,filesRead,filesLeft,children[i].fdIn);
+            assignTask(taskRemaining,pendings,filesRead,filesLeft,children[i].fdIn);
             ERROR_CHECK(execv(SLAVE,arg)); // Solo se ejecuta error_check si execv falla
             
         }else{
@@ -117,30 +124,24 @@ int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int
             children[i].pid=id;
             children[i].fdIn  = pipeMtoS[PIPE_WRITE];
             children[i].fdOut = pipeStoM[PIPE_READ];
-            children[i].pending = 1;
+            children[i].pending = pendings;
             
             ERROR_CHECK(close(pipeMtoS[PIPE_READ]));
-            ERROR_CHECK(close(pipeStoM[PIPE_WRITE]));
-                
-            
-        }
-        
+            ERROR_CHECK(close(pipeStoM[PIPE_WRITE]));       
+        }   
     }
-    
     return 0;
 }
 
-int assingTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd){
+int assignTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd){
     
     char buff[MAX_BUFFER_SIZE];
-
-    for (size_t i = 0; i < tasksToAssing; i++){
-        sprintf(buff, "%s\n", taskRemaining[*filesRead + i]);
-
-    ERROR_CHECK(write(fd, buff, strlen(buff)));
-        
-    }
+    int len=0;
     
+    for (size_t i = 0; i < tasksToAssing && *filesRead < filesLeft; i++){
+        len = sprintf(buff, "%s\n", taskRemaining[(*filesRead)++]);
+        ERROR_CHECK(write(fd, buff, len));   
+    }
 }
 
 int worksProcessed(char * buffer){
