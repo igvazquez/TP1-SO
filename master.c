@@ -12,10 +12,12 @@
 #define PIPE_WRITE 1
 #define PEND 5
 #define MAX_BUFFER_SIZE 200
-#define ERROR_CHECK(x) do { \
+#define INITIAL_TASKS 5
+#define ERROR_CHECK(x, msg) do { \
   int retval = (x); \
-  if (retval != 0) { \
-    fprintf(stderr, "Runtime error: %s returned %d at %s:%d", #x, retval, __FILE__, __LINE__); \
+  if (retval == -1) { \
+    fprintf(stderr, "Runtime error: %s returned %d at %s:%d\n", #x, retval, __FILE__, __LINE__); \
+    perror(msg); \
     exit(-1); \
   } \
 } while (0)
@@ -28,8 +30,8 @@ typedef struct slave_t
     int pending;
 } slave_t;
 
-int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int filesLeft);
-int assignTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd);
+int createChildren(slave_t children[],char *tasksRemaining[],int * filesRead, int filesLeft);
+void assignTask(char * tasksRemaining[], int * filesRead, int filesLeft, int fd);
 int worksProcessed(char * buffer);
 
 
@@ -41,63 +43,65 @@ int main(int argc, char const *argv[])
     }
 
     int filesLeft = argc-1;
-    int filesRead = 0, fdsAvailable = 0;
+    int filesRead = 0, fdsAvailable = 0, tasksDone = 0;
     int bytesRead=0;
-    char ** taskRemaining = argv; //salteo el primer argumento que es el ejecutable
+    char ** tasksRemaining = argv + 1;
     slave_t children[MAX_SLAVES];
-    createChildren(children,taskRemaining,&filesRead,filesLeft);
+    int childrenCreated = createChildren(children,tasksRemaining,&filesRead,filesLeft);
     
     fd_set fdSet;
     char buffer[250];
-    // Mientras queden archivos por leer
-    while (filesRead < filesLeft){
+
+    // bytesRead+=read(children[0].fdOut,buffer,MAX_BUFFER_SIZE);
+    // buffer[bytesRead] = 0;
+    // printf("%s\n", buffer);
+
+    while (filesRead < filesLeft || tasksDone < filesLeft){
+        printf("llegue\n");
         FD_ZERO(&fdSet);
 
-        for (size_t i = 0; i < MAX_SLAVES; i++){
+        for (size_t i = 0; i < childrenCreated; i++){
             FD_SET(children[i].fdOut , &fdSet);
         }
+        printf("hijes: %d\n",childrenCreated);
+        printf("max fd: %d\n",children[childrenCreated-1].fdOut);
+        ERROR_CHECK(fdsAvailable = select(children[childrenCreated-1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
+        printf("sali del select\n");
 
-        ERROR_CHECK(fdsAvailable = select(children[MAX_SLAVES].fdOut + 1, &fdSet, NULL, NULL, NULL));
-
-        for (size_t i = 0; i < MAX_SLAVES && fdsAvailable > 0; i++)
+        printf("%d\n",fdsAvailable);
+        for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++)
         {
             if (FD_ISSET(children[i].fdOut, &fdSet)){
-               ERROR_CHECK(bytesRead+=read(children[i].fdOut,buffer,MAX_BUFFER_SIZE));// Leer los outputs del slave 
-               printf("%s\n",buffer);
-               //worksProcessed(buffer);// Ver cuantas tareas hizo
+                printf("llegue a hacer el read\n");
+                ERROR_CHECK(bytesRead = read(children[i].fdOut,buffer,MAX_BUFFER_SIZE), "Master - read");// Leer los outputs del slave 
+                printf("%s\n",buffer);
+                tasksDone++;
+                //worksProcessed(buffer);// Ver cuantas tareas hizo
                 // Mandarle tantas tareas como las que ya realizo
                 // Escribir lo que devolvio el hijo en el archivo de salida para view
-                //fdsAvailable--;
+                fdsAvailable--;
             }
+            printf("sali de no hacer el read\n");
         }
-        
-        
-        
-        
-
+       
     }
-    
-
-
-    
     
     return 0;
 }
 
-int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int filesLeft){
+int createChildren(slave_t children[],char *tasksRemaining[],int * filesRead, int filesLeft){
     
-    int id,aux, pendings=1;
-    char *arg[2]={SLAVE,(char*)NULL};
-    
-    if(filesLeft < MAX_SLAVES*2){
-        pendings = 2;
+    int i, id, pendings=1;
+    char * initArgsArray[INITIAL_TASKS + 2];
+
+    if(filesLeft > MAX_SLAVES*5){
+        pendings = 5;
     }
 
-    for(int i = 0 ; i < MAX_SLAVES && *filesRead < filesLeft ; i++){
+    for(i = 0 ; i < MAX_SLAVES && *filesRead < filesLeft ; i++){
         
         int pipeMtoS[2];
         int pipeStoM[2];
-        aux = 0;
 
         if(pipe(pipeMtoS) == -1)
             return 1; //TODO: error managing
@@ -105,42 +109,43 @@ int createChildren(slave_t children[],char *taskRemaining[],int * filesRead, int
         if(pipe(pipeStoM) == -1)
             return 1; //TODO: error managing
         
-        if((id = fork()) == -1){
+        if( (id = fork()) == -1){
             return 2; //TODO: error managing
         }
         else if(id == 0){
-            
-            ERROR_CHECK(close(pipeMtoS[PIPE_WRITE]));
-            ERROR_CHECK(close(pipeStoM[PIPE_READ]));
-            ERROR_CHECK(dup2(pipeMtoS[PIPE_READ],STDIN_FILENO));
-            ERROR_CHECK(dup2(pipeStoM[PIPE_WRITE],STDOUT_FILENO));
-            ERROR_CHECK(close(pipeMtoS[PIPE_READ]));
-            ERROR_CHECK(close(pipeStoM[PIPE_WRITE]));
-            assignTask(taskRemaining,pendings,filesRead,filesLeft,children[i].fdIn);
-            ERROR_CHECK(execv(SLAVE,arg)); // Solo se ejecuta error_check si execv falla
-            
+            ERROR_CHECK(close(pipeMtoS[PIPE_WRITE]), "Master - close pipeMtoS[WRITE]");
+            ERROR_CHECK(close(pipeStoM[PIPE_READ]), "Master - close pipeStoM[READ]");
+            ERROR_CHECK(dup2(pipeMtoS[PIPE_READ],STDIN_FILENO), "pipeMtoS dup2");
+            ERROR_CHECK(dup2(pipeStoM[PIPE_WRITE],STDOUT_FILENO), "pipeStoM dup2");            
+            ERROR_CHECK(close(pipeMtoS[PIPE_READ]), "Master - close pipeMtoS[READ]");
+            ERROR_CHECK(close(pipeStoM[PIPE_WRITE]), "Master - close pipeStoM[WRITE]");
+            initArgsArray[0] = SLAVE;
+            for(size_t j = 1; j <= pendings; j++)
+                initArgsArray[j] = tasksRemaining[(*filesRead)++];
+            initArgsArray[pendings + 1] = NULL;
+            ERROR_CHECK(execv(SLAVE,initArgsArray), "Master - execv"); // Solo se ejecuta error_check si execv falla
         }else{
-            
+            *filesRead += INITIAL_TASKS;
             children[i].pid=id;
             children[i].fdIn  = pipeMtoS[PIPE_WRITE];
             children[i].fdOut = pipeStoM[PIPE_READ];
             children[i].pending = pendings;
             
-            ERROR_CHECK(close(pipeMtoS[PIPE_READ]));
-            ERROR_CHECK(close(pipeStoM[PIPE_WRITE]));       
+            ERROR_CHECK(close(pipeMtoS[PIPE_READ]), "Master - close pipeMtoS[READ]");
+            ERROR_CHECK(close(pipeStoM[PIPE_WRITE]), "Master - pipeStoM[WRITE]");
         }   
     }
-    return 0;
+    return i;
 }
 
-int assignTask(char * taskRemaining[],int tasksToAssing,int * filesRead, int filesLeft, int fd){
+void assignTask(char * tasksRemaining[],int * filesRead, int filesLeft, int fd){
     
     char buff[MAX_BUFFER_SIZE];
     int len=0;
     
-    for (size_t i = 0; i < tasksToAssing && *filesRead < filesLeft; i++){
-        len = sprintf(buff, "%s\n", taskRemaining[(*filesRead)++]);
-        ERROR_CHECK(write(fd, buff, len));   
+    if (*filesRead < filesLeft){
+        len = sprintf(buff, "%s\n", tasksRemaining[(*filesRead)++]);
+        ERROR_CHECK(write(fd, buff, len), "Master - assignTask Write");   
     }
 }
 

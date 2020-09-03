@@ -10,10 +10,16 @@ int main(int argc, char const *argv[])
     char file[FILE_SIZE];
     int len;
     int fd;
-    while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE) ) > 0){
 
-        write(STDOUT_FILENO,buffer,BUFFER_SIZE);
+    printf("slave running\n");
 
+    for (size_t i = 1; i < argc; i++){
+        printf("%d\t%s\t\n", getpid(), argv[i]);
+    }
+
+    // while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE) ) > 0){
+
+    //     write(STDOUT_FILENO,buffer,BUFFER_SIZE);
 
 
 /*
@@ -30,7 +36,7 @@ int main(int argc, char const *argv[])
                 
             }
   */      
-        }
+    // }
 
     return 0;
     }
