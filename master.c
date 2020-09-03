@@ -49,6 +49,10 @@ int main(int argc, char const *argv[])
     int bytesRead = 0;
     char **tasksRemaining = argv + 1;
     slave_t children[MAX_SLAVES];
+
+    if(setvbuf(stdout, NULL, _IONBF, 0) != 0)
+        ERROR_CHECK(-1, "Master - Setvbuf");
+
     int childrenCreated = createChildren(children, tasksRemaining, &filesRead, filesLeft);
 
     fd_set fdSet;
@@ -65,16 +69,16 @@ int main(int argc, char const *argv[])
         }
         ERROR_CHECK(fdsAvailable = select(children[childrenCreated - 1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
        
-        printf("%d\n", fdsAvailable);
+        // printf("fdsAvailable: %d\n", fdsAvailable);
         for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++)
         {
             if (FD_ISSET(children[i].fdOut, &fdSet))
             {
-                printf("hijo: %d\n", i);
                 ERROR_CHECK(bytesRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE), "Master - read"); // Leer los outputs del slave
                 buffer[bytesRead]=0;
-                printf("Output: %s\n", buffer);
+                printf("Output hijo %d: %s\n", i,buffer);
                 tasksDone++;
+                printf("tasksDone: %d\n", tasksDone);
                 //worksProcessed(buffer);// Ver cuantas tareas hizo
                 // Mandarle tantas tareas como las que ya realizo
                 // Escribir lo que devolvio el hijo en el archivo de salida para view

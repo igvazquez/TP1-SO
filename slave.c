@@ -28,7 +28,10 @@ int main(int argc, char const *argv[])
     char file[FILE_SIZE];
     int len, fd;
 
-    printf("slave %d running with %d files\n", getpid(), argc - 1);
+    if(setvbuf(stdout, NULL, _IONBF, 0) != 0)
+        ERROR_CHECK(-1, "Slave - Setvbuf");
+
+    // printf("slave %d running with %d files\n", getpid(), argc - 1);
 
     for (size_t i = 1; i < argc; i++)
     {
