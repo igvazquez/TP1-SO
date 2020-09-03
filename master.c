@@ -132,7 +132,6 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
             for (size_t j = 1; j <= pendings; j++)
                 initArgsArray[j] = tasksRemaining[(*filesRead)++];
             initArgsArray[pendings + 1] = NULL;
-
             ERROR_CHECK(execv(SLAVE, initArgsArray), "Master - execv"); // Solo se ejecuta error_check si execv falla
         }
         else{
