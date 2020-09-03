@@ -53,7 +53,6 @@ int main(int argc, char const *argv[])
 
     fd_set fdSet;
     char buffer[250];
-        printf("hijes: %d\n", childrenCreated);
 
     while (filesRead < filesLeft || tasksDone < filesLeft)
     {
@@ -63,9 +62,9 @@ int main(int argc, char const *argv[])
         {
             FD_SET(children[i].fdOut, &fdSet);
         }
+
         ERROR_CHECK(fdsAvailable = select(children[childrenCreated - 1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
        
-        printf("%d\n", fdsAvailable);
         for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++)
         {
             if (FD_ISSET(children[i].fdOut, &fdSet))
