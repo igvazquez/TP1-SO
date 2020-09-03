@@ -57,7 +57,6 @@ int main(int argc, char const *argv[])
     // printf("%s\n", buffer);
 
     while (filesRead < filesLeft || tasksDone < filesLeft){
-        printf("llegue\n");
         FD_ZERO(&fdSet);
 
         for (size_t i = 0; i < childrenCreated; i++){
@@ -66,13 +65,11 @@ int main(int argc, char const *argv[])
         printf("hijes: %d\n",childrenCreated);
         printf("max fd: %d\n",children[childrenCreated-1].fdOut);
         ERROR_CHECK(fdsAvailable = select(children[childrenCreated-1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
-        printf("sali del select\n");
 
         printf("%d\n",fdsAvailable);
         for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++)
         {
             if (FD_ISSET(children[i].fdOut, &fdSet)){
-                printf("llegue a hacer el read\n");
                 ERROR_CHECK(bytesRead = read(children[i].fdOut,buffer,MAX_BUFFER_SIZE), "Master - read");// Leer los outputs del slave 
                 printf("%s\n",buffer);
                 tasksDone++;
@@ -81,7 +78,6 @@ int main(int argc, char const *argv[])
                 // Escribir lo que devolvio el hijo en el archivo de salida para view
                 fdsAvailable--;
             }
-            printf("sali de no hacer el read\n");
         }
        
     }

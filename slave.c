@@ -1,8 +1,20 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define BUFFER_SIZE 200
+#define BUFFER_SIZE 2000
 #define FILE_SIZE 50
+#define ERROR_CHECK(x, msg) do { \
+  int retval = (x); \
+  if (retval == -1) { \
+    fprintf(stderr, "Runtime error: %s returned %d at %s:%d\n", #x, retval, __FILE__, __LINE__); \
+    perror(msg); \
+    exit(-1); \
+  } \
+} while (0)
 
 int main(int argc, char const *argv[])
 {
@@ -11,10 +23,22 @@ int main(int argc, char const *argv[])
     int len;
     int fd;
 
-    printf("slave running\n");
+    printf("slave %d running with %d files\n", getpid(),argc-1);
 
     for (size_t i = 1; i < argc; i++){
-        printf("%d\t%s\t\n", getpid(), argv[i]);
+        sprintf(buffer, "tail %s", argv[i]);
+        // printf("%d\t%s\t\n", getpid(), argv[i]);
+        printf("pre popen\n");
+        FILE * fp = popen(buffer, "r");
+        if (fp == NULL)
+            ERROR_CHECK(-1, "Slave - popen");
+
+        while (fgets(buffer, BUFFER_SIZE, fp) != NULL)
+            printf("%s", buffer);
+        
+        printf("post popen\n");
+
+        ERROR_CHECK(pclose(fp), "Slave - pclose");
     }
 
     // while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE) ) > 0){
