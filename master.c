@@ -1,5 +1,5 @@
 #define SLAVE "./slave.out"
-#define MAX_SLAVES 3
+#define MAX_SLAVES 5
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 #define MAX_BUFFER_SIZE 200
@@ -77,13 +77,16 @@ int main(int argc, char const *argv[])
                 buffer[charsRead] = 0;
                 
                 if(charsRead){
+                    
                     token = strtok(buffer,delim);
                     while(token != NULL){
                         replaceChar(token,'\t','\n');
-                        printf("Output hijo %d: %s\n", i, token);
+//                        printf("Output hijo %d: %s\n", i, token);
+                        printf("%s\n",token);
+  
                         children[i].pending--;
                         tasksDone++;
-                        printf("tasksDone: %d\n", tasksDone);
+  //                      printf("tasksDone: %d\n", tasksDone);
                         token = strtok(NULL,delim);
                     }
 
