@@ -10,7 +10,6 @@
 #define MAX_SLAVES 5
 #define PIPE_READ 0
 #define PIPE_WRITE 1
-#define PEND 5
 #define MAX_BUFFER_SIZE 200
 #define INITIAL_TASKS 2
 #define ERROR_CHECK(x, msg)                                                                              \
@@ -50,35 +49,39 @@ int main(int argc, char const *argv[])
     char **tasksRemaining = argv + 1;
     slave_t children[MAX_SLAVES];
 
-    if(setvbuf(stdout, NULL, _IONBF, 0) != 0)
+    if (setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Master - Setvbuf");
 
     int childrenCreated = createChildren(children, tasksRemaining, &filesRead, filesLeft);
 
     fd_set fdSet;
     char buffer[250];
-
+    int i = 0;
     while (filesRead < filesLeft || tasksDone < filesLeft)
     {
+
         FD_ZERO(&fdSet);
 
         for (size_t i = 0; i < childrenCreated; i++)
         {
             FD_SET(children[i].fdOut, &fdSet);
         }
-
         ERROR_CHECK(fdsAvailable = select(children[childrenCreated - 1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
-       
-        // printf("fdsAvailable: %d\n", fdsAvailable);
-        for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++)
-        {
-            if (FD_ISSET(children[i].fdOut, &fdSet))
-            {
-                ERROR_CHECK(bytesRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE), "Master - read"); // Leer los outputs del slave
-                buffer[bytesRead]=0;
-                printf("Output hijo %d: %s\n", i,buffer);
+        for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++){
+
+            if (FD_ISSET(children[i].fdOut, &fdSet)){
+
+                ERROR_CHECK(bytesRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE - 1), "Master - read"); // Leer los outputs del slave
+                buffer[bytesRead] = 0;
+                if(bytesRead){
+                    
+
+                printf("Output hijo %d: %s\n", i, buffer);
                 tasksDone++;
+                children[i].pending--;
                 printf("tasksDone: %d\n", tasksDone);
+                
+                }
                 //worksProcessed(buffer);// Ver cuantas tareas hizo
                 // Mandarle tantas tareas como las que ya realizo
                 // Escribir lo que devolvio el hijo en el archivo de salida para view
@@ -96,9 +99,9 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
     int i, id, pendings = 1;
     char *initArgsArray[INITIAL_TASKS + 2];
 
-    if (filesLeft > MAX_SLAVES * 2)
+    if (filesLeft > MAX_SLAVES * INITIAL_TASKS)
     {
-        pendings = 2;
+        pendings = INITIAL_TASKS;
     }
 
     for (i = 0; i < MAX_SLAVES && *filesRead < filesLeft; i++)
@@ -131,7 +134,8 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
             initArgsArray[pendings + 1] = NULL;
             ERROR_CHECK(execv(SLAVE, initArgsArray), "Master - execv"); // Solo se ejecuta error_check si execv falla
         }
-        else{
+        else
+        {
             *filesRead += pendings;
             children[i].pid = id;
             children[i].fdIn = pipeMtoS[PIPE_WRITE];

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BUFFER_SIZE 120
+#define BUFFER_SIZE 300
 #define FILE_SIZE 50
 #define ERROR_CHECK(x, msg)                                                                              \
     do                                                                                                   \
@@ -41,20 +41,21 @@ int main(int argc, char const *argv[])
         if (fp == NULL)
             ERROR_CHECK(-1, "Slave - popen");
 
-        len = fread(buffer, sizeof(char), BUFFER_SIZE, fp);
+        len = fread(buffer, sizeof(char), BUFFER_SIZE-1, fp);
+        buffer[len] = 0;
 
         if (ferror(fp))
         {
             ERROR_CHECK(-1, "Slave - fread");
         }
-        buffer[len] = 0;
         printf("%s\n", buffer);
 
         ERROR_CHECK(pclose(fp), "Slave - pclose");
     }
 
-    // while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE) ) > 0){
+    /*while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE) ) > 0){
 
+    }*/
     //     write(STDOUT_FILENO,buffer,BUFFER_SIZE);
 
     /*
