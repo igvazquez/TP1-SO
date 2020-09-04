@@ -1,6 +1,6 @@
 master.out
 slave.out
-view
+view.out
 test/*
 satFiles/*
 .gitignore
