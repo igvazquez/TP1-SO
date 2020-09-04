@@ -34,7 +34,7 @@ typedef struct slave_t
 } slave_t;
 
 int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft);
-void assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd);
+int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd);
 int worksProcessed(char *buffer);
 
 int main(int argc, char const *argv[])
@@ -48,6 +48,8 @@ int main(int argc, char const *argv[])
     int filesRead = 0, fdsAvailable = 0, tasksDone = 0,charsRead = 0;
     char **tasksRemaining = argv + 1;
     slave_t children[MAX_SLAVES];
+    char * token;
+    char * delim = "\n";
 
     if (setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Master - Setvbuf");
@@ -75,19 +77,19 @@ int main(int argc, char const *argv[])
                 buffer[charsRead] = 0;
                 
                 if(charsRead){
-                    printf("Output hijo %d: %s\n", i, buffer);
-                    tasksDone++;
-                    children[i].pending--;
-                    printf("tasksDone: %d\n", tasksDone);
+                    token = strtok(buffer,delim);
+                    while(token != NULL){
+                        printf("Output hijo %d: %s\n", i, token);
+                        children[i].pending--;
+                        tasksDone++;
+                        printf("tasksDone: %d\n", tasksDone);
+                        token = strtok(NULL,delim);
+                    }
 
                     if(children[i].pending == 0){
-                        assignTask(tasksRemaining, &filesRead, filesLeft, children[i].fdIn);
-                        children[i].pending += 1;
+                        children[i].pending += assignTask(tasksRemaining, &filesRead, filesLeft, children[i].fdIn);
                     }
                 }
-                //worksProcessed(buffer);// Ver cuantas tareas hizo
-                // Mandarle tantas tareas como las que ya realizo
-                // Escribir lo que devolvio el hijo en el archivo de salida para view
                 fdsAvailable--;
             }
         }
@@ -151,7 +153,7 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
     return i;
 }
 
-void assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
+int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
 {
 
     char buff[MAX_BUFFER_SIZE];
@@ -160,8 +162,11 @@ void assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
     if (*filesRead < filesLeft)
     {
         len = sprintf(buff, "%s", tasksRemaining[(*filesRead)++]);
-        ERROR_CHECK(write(fd, buff, len), "Master - assignTask Write");
+        ERROR_CHECK(write(fd, buff, len+1), "Master - assignTask Write");
+        return 1;
     }
+
+    return 0;
 }
 
 int worksProcessed(char *buffer)

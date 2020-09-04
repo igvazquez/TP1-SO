@@ -28,6 +28,7 @@ int main(int argc, char const *argv[])
     char buffer[BUFFER_SIZE];
     int len;
 
+
     if(setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Slave - Setvbuf");
 
@@ -52,9 +53,9 @@ void processTask(const char * file){
    
     char cmd[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
-
-    // sprintf(cmd, "minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file);
-    sprintf(cmd, "tail %s", file);
+    char * aux;
+    sprintf(cmd, "minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file);
+    // sprintf(cmd, "tail %s", file);
 
     FILE *fp = popen(cmd, "r");
 
@@ -66,6 +67,9 @@ void processTask(const char * file){
 
     if (ferror(fp))
         ERROR_CHECK(-1, "Slave - fread");
+
+    while ((aux = strchr(buffer, '\n')) != NULL)
+        *aux = '\t';
 
     printf("%s\n", buffer);
   // write(STDOUT_FILENO,buffer,len+1);
