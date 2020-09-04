@@ -6,7 +6,7 @@
 #include <string.h>
 #include <sys/select.h>
 
-#define SLAVE "./slave"
+#define SLAVE "./slave.out"
 #define MAX_SLAVES 3
 #define PIPE_READ 0
 #define PIPE_WRITE 1
@@ -23,6 +23,7 @@
             exit(-1);                                                                                    \
         }                                                                                                \
     } while (0)
+
 
 typedef struct slave_t
 {
@@ -44,8 +45,7 @@ int main(int argc, char const *argv[])
     }
 
     int filesLeft = argc - 1;
-    int filesRead = 0, fdsAvailable = 0, tasksDone = 0;
-    int bytesRead = 0;
+    int filesRead = 0, fdsAvailable = 0, tasksDone = 0,charsRead = 0;
     char **tasksRemaining = argv + 1;
     slave_t children[MAX_SLAVES];
 
@@ -56,8 +56,8 @@ int main(int argc, char const *argv[])
 
     fd_set fdSet;
     char buffer[250];
-    int i = 0;
-    while (filesRead < filesLeft || tasksDone < filesLeft)
+
+    while (tasksDone < filesLeft)
     {
 
         FD_ZERO(&fdSet);
@@ -67,14 +67,14 @@ int main(int argc, char const *argv[])
             FD_SET(children[i].fdOut, &fdSet);
         }
         ERROR_CHECK(fdsAvailable = select(children[childrenCreated - 1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
-        for (size_t i = 0; i < childrenCreated && fdsAvailable > 0; i++){
+        for (int i = 0; i < childrenCreated && fdsAvailable > 0; i++){
 
             if (FD_ISSET(children[i].fdOut, &fdSet)){
 
-                ERROR_CHECK(bytesRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE - 1), "Master - read"); // Leer los outputs del slave
-                buffer[bytesRead] = 0;
+                ERROR_CHECK(charsRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE - 1), "Master - read"); // Leer los outputs del slave
+                buffer[charsRead] = 0;
                 
-                if(bytesRead){
+                if(charsRead){
                     printf("Output hijo %d: %s\n", i, buffer);
                     tasksDone++;
                     children[i].pending--;
@@ -159,7 +159,7 @@ void assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
 
     if (*filesRead < filesLeft)
     {
-        len = sprintf(buff, "%s\n", tasksRemaining[(*filesRead)++]);
+        len = sprintf(buff, "%s", tasksRemaining[(*filesRead)++]);
         ERROR_CHECK(write(fd, buff, len), "Master - assignTask Write");
     }
 }

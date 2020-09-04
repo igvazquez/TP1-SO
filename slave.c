@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 2
 #include <unistd.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -5,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BUFFER_SIZE 300
+#define BUFFER_SIZE 1000
 #define FILE_SIZE 50
 #define ERROR_CHECK(x, msg)                                                                              \
     do                                                                                                   \
@@ -19,15 +20,13 @@
         }                                                                                                \
     } while (0)
 
-void processTask(char * file);
-//grep -o -e "Number of.*[0-9]\+" -e "CPU time.*" -e ".*SATISFIABLE"
+
+void processTask(const char * file);
 
 int main(int argc, char const *argv[])
 {
-    char cmd[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
-    char file[FILE_SIZE];
-    int len, fd;
+    int len;
 
     if(setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Slave - Setvbuf");
@@ -37,8 +36,8 @@ int main(int argc, char const *argv[])
     for (size_t i = 1; i < argc; i++)
         processTask(argv[i]);
 
-    while(len = read(STDIN_FILENO,buffer,BUFFER_SIZE)){
-       
+    while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE)) ){
+
         if (len == -1)
             ERROR_CHECK(len, "Slave - read");
 
@@ -49,11 +48,12 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-void processTask(char * file){
+void processTask(const char * file){
    
     char cmd[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
 
+    // sprintf(cmd, "minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file);
     sprintf(cmd, "tail %s", file);
 
     FILE *fp = popen(cmd, "r");
@@ -68,6 +68,7 @@ void processTask(char * file){
         ERROR_CHECK(-1, "Slave - fread");
 
     printf("%s\n", buffer);
+  // write(STDOUT_FILENO,buffer,len+1);
 
     ERROR_CHECK(pclose(fp), "Slave - pclose");
 }
