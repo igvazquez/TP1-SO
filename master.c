@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #define SLAVE "./slave.out"
 #define MAX_SLAVES 5
 #define PIPE_READ 0
@@ -36,6 +38,8 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
 int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd);
 int worksProcessed(char *buffer);
 void replaceChar(char * buffer, char oldChar, char newChar);
+int createShareMemory();
+
 
 int main(int argc, char const *argv[])
 {
@@ -48,6 +52,9 @@ int main(int argc, char const *argv[])
     int filesRead = 0, fdsAvailable = 0, tasksDone = 0,charsRead = 0;
     char **tasksRemaining =(char **)argv + 1;
     slave_t children[MAX_SLAVES];
+
+    int fdShm = createShareMemory();
+    //createSemaphore();
     
 
     if (setvbuf(stdout, NULL, _IONBF, 0) != 0)
@@ -182,4 +189,8 @@ void replaceChar(char * buffer, char oldChar, char newChar){
     char * aux;
     while ((aux = strchr(buffer, oldChar)) != NULL)
         *aux = newChar;
+}
+
+int createShareMemory(){
+    
 }

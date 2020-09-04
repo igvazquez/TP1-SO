@@ -2,3 +2,6 @@ master.out
 slave.out
 view
 test/*
+satFiles/*
+.gitignore
+
