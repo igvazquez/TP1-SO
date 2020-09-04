@@ -19,6 +19,7 @@
         }                                                                                                \
     } while (0)
 
+void processTask(char * file);
 //grep -o -e "Number of.*[0-9]\+" -e "CPU time.*" -e ".*SATISFIABLE"
 
 int main(int argc, char const *argv[])
@@ -34,45 +35,39 @@ int main(int argc, char const *argv[])
     // printf("slave %d running with %d files\n", getpid(), argc - 1);
 
     for (size_t i = 1; i < argc; i++)
-    {
-        sprintf(cmd, "tail %s", argv[i]);
-        // printf("%d\t%s\t\n", getpid(), argv[i]);
-        FILE *fp = popen(cmd, "r");
-        if (fp == NULL)
-            ERROR_CHECK(-1, "Slave - popen");
+        processTask(argv[i]);
 
-        len = fread(buffer, sizeof(char), BUFFER_SIZE-1, fp);
-        buffer[len] = 0;
+    while(len = read(STDIN_FILENO,buffer,BUFFER_SIZE)){
+       
+        if (len == -1)
+            ERROR_CHECK(len, "Slave - read");
 
-        if (ferror(fp))
-        {
-            ERROR_CHECK(-1, "Slave - fread");
-        }
-        printf("%s\n", buffer);
-
-        ERROR_CHECK(pclose(fp), "Slave - pclose");
+        processTask(buffer);
+        
     }
 
-    /*while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE) ) > 0){
-
-    }*/
-    //     write(STDOUT_FILENO,buffer,BUFFER_SIZE);
-
-    /*
-        for (size_t i = 0,j=0; buffer[i] != 0 ; i++)
-        {
-            if(buffer[i]!= '\n'){
-                file[j++]=buffer[i];
-            }
-            else{
-                file[j]=0;
-                j=0;
-                if(fd=open(file,O_RDONLY)==-1)
-                    //ERROR 
-                
-            }
-  */
-    // }
-
     return 0;
+}
+
+void processTask(char * file){
+   
+    char cmd[BUFFER_SIZE];
+    char buffer[BUFFER_SIZE];
+
+    sprintf(cmd, "tail %s", file);
+
+    FILE *fp = popen(cmd, "r");
+
+    if (fp == NULL)
+        ERROR_CHECK(-1, "Slave - popen");
+
+    int len = fread(buffer, sizeof(char), BUFFER_SIZE-1, fp);
+    buffer[len] = 0;
+
+    if (ferror(fp))
+        ERROR_CHECK(-1, "Slave - fread");
+
+    printf("%s\n", buffer);
+
+    ERROR_CHECK(pclose(fp), "Slave - pclose");
 }

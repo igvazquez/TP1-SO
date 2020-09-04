@@ -7,7 +7,7 @@
 #include <sys/select.h>
 
 #define SLAVE "./slave"
-#define MAX_SLAVES 5
+#define MAX_SLAVES 3
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 #define MAX_BUFFER_SIZE 200
@@ -73,14 +73,17 @@ int main(int argc, char const *argv[])
 
                 ERROR_CHECK(bytesRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE - 1), "Master - read"); // Leer los outputs del slave
                 buffer[bytesRead] = 0;
-                if(bytesRead){
-                    
-
-                printf("Output hijo %d: %s\n", i, buffer);
-                tasksDone++;
-                children[i].pending--;
-                printf("tasksDone: %d\n", tasksDone);
                 
+                if(bytesRead){
+                    printf("Output hijo %d: %s\n", i, buffer);
+                    tasksDone++;
+                    children[i].pending--;
+                    printf("tasksDone: %d\n", tasksDone);
+
+                    if(children[i].pending == 0){
+                        assignTask(tasksRemaining, &filesRead, filesLeft, children[i].fdIn);
+                        children[i].pending += 1;
+                    }
                 }
                 //worksProcessed(buffer);// Ver cuantas tareas hizo
                 // Mandarle tantas tareas como las que ya realizo
