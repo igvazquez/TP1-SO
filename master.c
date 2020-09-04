@@ -46,10 +46,9 @@ int main(int argc, char const *argv[])
 
     int filesLeft = argc - 1;
     int filesRead = 0, fdsAvailable = 0, tasksDone = 0,charsRead = 0;
-    char **tasksRemaining = argv + 1;
+    char **tasksRemaining =(char **)argv + 1;
     slave_t children[MAX_SLAVES];
-    char * token;
-    char * delim = "\n";
+    
 
     if (setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Master - Setvbuf");
@@ -58,9 +57,10 @@ int main(int argc, char const *argv[])
 
     fd_set fdSet;
     char buffer[250];
+    char * token;
+    char * delim = "\n";
 
-    while (tasksDone < filesLeft)
-    {
+    while (tasksDone < filesLeft){
 
         FD_ZERO(&fdSet);
 

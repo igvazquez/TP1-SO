@@ -21,7 +21,7 @@
 
 
 
-void processTask(const char * file);
+void processTask(char * file);
 void replaceChar(char * buffer, char oldChar, char newChar);
 
 int main(int argc, char const *argv[])
@@ -33,7 +33,7 @@ int main(int argc, char const *argv[])
         ERROR_CHECK(-1, "Slave - Setvbuf");
 
     for (size_t i = 1; i < argc; i++)
-        processTask(argv[i]);
+        processTask((char*)argv[i]);
 
     while( (len = read(STDIN_FILENO,buffer,BUFFER_SIZE)) ){
 
@@ -47,34 +47,28 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-void processTask(const char * file){
+void processTask(char * file){
    
     char cmd[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
     int len = 0;
     snprintf(cmd, sizeof(cmd),"minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file);
+    replaceChar(file,'\n','\t');
 
-    len += snprintf(buffer,sizeof(buffer),"Nombre del archivo: %s\n",file);
-    
     FILE *fp = popen(cmd, "r");
-
     if (fp == NULL)
         ERROR_CHECK(-1, "Slave - popen");
 
     len += fread(buffer+len, sizeof(char), sizeof(buffer)-1, fp);
     buffer[len] = 0;
 
+    replaceChar(buffer,'\n','\t');
+
     if (ferror(fp))
         ERROR_CHECK(-1, "Slave - fread");
     
-    int pid = getpid();
-    len += snprintf(buffer+len,sizeof(buffer),"ID del esclavo que proceso: %d\n",pid);
+    printf("Nombre del archivo: %s\t%sID del esclavo: %d\t\n", file,buffer,getpid());
     
-    replaceChar(buffer,'\n','\t');
-
-    printf("%s\n", buffer);
-    
-    //write(STDOUT_FILENO,buffer,len+1);
     ERROR_CHECK(pclose(fp), "Slave - pclose");
 }
 
