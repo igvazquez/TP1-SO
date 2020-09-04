@@ -1,11 +1,3 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/select.h>
-
 #define SLAVE "./slave.out"
 #define MAX_SLAVES 3
 #define PIPE_READ 0
@@ -24,6 +16,13 @@
         }                                                                                                \
     } while (0)
 
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/select.h>
 
 typedef struct slave_t
 {
@@ -36,6 +35,7 @@ typedef struct slave_t
 int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft);
 int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd);
 int worksProcessed(char *buffer);
+void replaceChar(char * buffer, char oldChar, char newChar);
 
 int main(int argc, char const *argv[])
 {
@@ -79,6 +79,7 @@ int main(int argc, char const *argv[])
                 if(charsRead){
                     token = strtok(buffer,delim);
                     while(token != NULL){
+                        replaceChar(token,'\t','\n');
                         printf("Output hijo %d: %s\n", i, token);
                         children[i].pending--;
                         tasksDone++;
@@ -161,7 +162,7 @@ int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
 
     if (*filesRead < filesLeft)
     {
-        len = sprintf(buff, "%s", tasksRemaining[(*filesRead)++]);
+        len = snprintf(buff, sizeof(buff),"%s", tasksRemaining[(*filesRead)++]);
         ERROR_CHECK(write(fd, buff, len+1), "Master - assignTask Write");
         return 1;
     }
@@ -172,4 +173,10 @@ int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
 int worksProcessed(char *buffer)
 {
     return 0;
+}
+
+void replaceChar(char * buffer, char oldChar, char newChar){
+    char * aux;
+    while ((aux = strchr(buffer, oldChar)) != NULL)
+        *aux = newChar;
 }

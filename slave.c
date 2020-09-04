@@ -1,13 +1,5 @@
 #define _POSIX_C_SOURCE 2
-#include <unistd.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-
 #define BUFFER_SIZE 1000
-#define FILE_SIZE 50
 #define ERROR_CHECK(x, msg)                                                                              \
     do                                                                                                   \
     {                                                                                                    \
@@ -20,8 +12,17 @@
         }                                                                                                \
     } while (0)
 
+#include <unistd.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+
+
 
 void processTask(const char * file);
+void replaceChar(char * buffer, char oldChar, char newChar);
 
 int main(int argc, char const *argv[])
 {
@@ -31,8 +32,6 @@ int main(int argc, char const *argv[])
 
     if(setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Slave - Setvbuf");
-
-    // printf("slave %d running with %d files\n", getpid(), argc - 1);
 
     for (size_t i = 1; i < argc; i++)
         processTask(argv[i]);
@@ -55,7 +54,6 @@ void processTask(const char * file){
     char buffer[BUFFER_SIZE];
     char * aux;
     sprintf(cmd, "minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file);
-    // sprintf(cmd, "tail %s", file);
 
     FILE *fp = popen(cmd, "r");
 
@@ -68,11 +66,16 @@ void processTask(const char * file){
     if (ferror(fp))
         ERROR_CHECK(-1, "Slave - fread");
 
-    while ((aux = strchr(buffer, '\n')) != NULL)
-        *aux = '\t';
+    replaceChar(buffer,'\n','\t');
 
     printf("%s\n", buffer);
   // write(STDOUT_FILENO,buffer,len+1);
 
     ERROR_CHECK(pclose(fp), "Slave - pclose");
+}
+
+void replaceChar(char * buffer, char oldChar, char newChar){
+    char * aux;
+    while ((aux = strchr(buffer, oldChar)) != NULL)
+        *aux = newChar;
 }
