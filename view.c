@@ -12,6 +12,7 @@
 #define SEM_NAME "/IPC_Semaphore"
 #define NAME "/IPC_Information"
 #define SIZE 2000
+#define MAX_BUFF 20
 #define ERROR_CHECK(x, msg)                                                                              \
     do {                                                                                                 \
         int retval = (x);                                                                                \
@@ -26,8 +27,17 @@ int copyToShareMem(char *dest, const char *source);
 
 int main(int argc, char const *argv[]) {
     
-    int filesToRead = atoi(argv[1]);
+    int filesToRead;
 
+    if (argc <= 1){
+        char filesToReadBuff[MAX_BUFF];
+        ERROR_CHECK(read(STDIN_FILENO, filesToReadBuff, MAX_BUFF), "View - read stdin");
+        filesToRead = atoi(filesToReadBuff);
+        printf("files to Read %d\n",filesToRead);
+    }else{
+        filesToRead = atoi(argv[1]);
+    }
+    
     struct stat myStat;
     int shm_fd;
     char * ptr;
@@ -50,7 +60,7 @@ int main(int argc, char const *argv[]) {
     char buffer[SIZE];
     while(outputsRead < filesToRead){
 
-        sem_wait(sem_id);
+        ERROR_CHECK(sem_wait(sem_id), "View - sem wait");
         ptr += copyToShareMem(buffer,ptr);
         outputsRead++;
         printf("%s\n",buffer);
@@ -62,10 +72,6 @@ int main(int argc, char const *argv[]) {
     if(state != 0 && state != ENOENT){
         ERROR_CHECK(-1,"Unlink semaphore error");
     }
-
-
-    
-
     
     ERROR_CHECK(munmap(shm_base, myStat.st_size), "View - munmap");
 

@@ -1,6 +1,7 @@
 master.out
 slave.out
 view.out
+output.txt
 test/*
 satFiles/*
 .gitignore

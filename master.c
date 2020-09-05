@@ -9,7 +9,7 @@
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 #define MAX_BUFFER_SIZE 200
-#define INITIAL_TASKS 2
+#define INITIAL_TASKS 3
 #define ERROR_CHECK(x, msg)                                                                              \
     do {                                                                                                 \
         int retval = (x);                                                                                \
@@ -48,6 +48,7 @@ int createSharedMemory(int size, char **shm_base);
 void closeSharedMemory(char *shm_base, int size, int shm_fd);
 void closeFD(slave_t children[], int childrensCreated);
 int copyToShareMem(char *dest, const char *source);
+int writeOutput(char * output, FILE * outputFile, char * shm_ptr);
 
     int main(int argc, char const *argv[]) {
     if (argc == 1) {
@@ -61,11 +62,13 @@ int copyToShareMem(char *dest, const char *source);
     char *ptr;
     slave_t children[MAX_SLAVES];
 
-    sem_t *sem_id = sem_open(SEM_NAME, O_CREAT, 0666, 0);
+    sem_t * sem_id = sem_open(SEM_NAME, O_CREAT, 0666, 0);
 
     if (sem_id == SEM_FAILED) {
         ERROR_CHECK(-1, "Semaphore creation failed");
     }
+
+    FILE * outputFile = fopen("output.txt", "w");
 
     int shm_size = filesLeft * SIZE_FD;
     int shm_fd = createSharedMemory(shm_size, &shm_base);
@@ -80,6 +83,9 @@ int copyToShareMem(char *dest, const char *source);
     char buffer[250];
     char *token;
     char *delim = "\n";
+
+    printf("%d", filesLeft);
+    sleep(2);
 
     while (tasksDone < filesLeft) {
         FD_ZERO(&fdSet);
@@ -97,10 +103,11 @@ int copyToShareMem(char *dest, const char *source);
                     token = strtok(buffer, delim);
                     while (token != NULL) {
                         replaceChar(token, '\t', '\n');
-                        ptr += copyToShareMem(ptr, token);
+                        // ptr += copyToShareMem(ptr, token);
+                        ptr += writeOutput(token, outputFile, ptr);
                         children[i].pending--;
                         tasksDone++;
-                        sem_post(sem_id);
+                        ERROR_CHECK(sem_post(sem_id), "Master - sem post");
                         token = strtok(NULL, delim);
                     }
 
@@ -114,26 +121,36 @@ int copyToShareMem(char *dest, const char *source);
     }
     closeSharedMemory(shm_base, shm_size, shm_fd);
     closeFD(children, childrenCreated);
-  ERROR_CHECK(sem_close(sem_id),"Closing semaphore error");
+    ERROR_CHECK(sem_close(sem_id),"Closing semaphore error");
   /*
     int state = sem_unlink(SEM_NAME);
     if(state != 0 && state != ENOENT){
         ERROR_CHECK(-1,"Unlink semaphore error");
     }   
     */
-    printf("Number of files: %d", filesRead);
    return 0;
 }
 
 int copyToShareMem(char *dest, const char *source) {
     int i;
-    for (i = 0; source[i] != 0; i++) {
+    for ( i = 0; source[i] != 0; i++) {
         dest[i] = source[i];
     }
 
     dest[i] = 0;
 
     return i + 1;
+}
+
+int writeOutput(char * output, FILE * outputFile, char * shm_ptr){
+    int len = strlen(output);
+
+    if(fwrite(output, sizeof(char), len, outputFile) != len)
+        ERROR_CHECK(-1, "Master - fwrite output file");
+        
+    memcpy((void*)shm_ptr,(void*)output,len+1);
+    return len+1;
+    
 }
 
 int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft) {
@@ -191,10 +208,6 @@ int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd) {
         return 1;
     }
 
-    return 0;
-}
-
-int worksProcessed(char *buffer) {
     return 0;
 }
 
