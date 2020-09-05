@@ -32,7 +32,6 @@ int main(int argc, char const *argv[]) {
         char filesToReadBuff[MAX_BUFF];
         ERROR_CHECK(read(STDIN_FILENO, filesToReadBuff, MAX_BUFF), "View - read stdin");
         filesToRead = atoi(filesToReadBuff);
-        printf("files to Read %d\n", filesToRead);
     } else {
         filesToRead = atoi(argv[1]);
     }
@@ -67,7 +66,8 @@ int main(int argc, char const *argv[]) {
     ERROR_CHECK(sem_close(sem_id), "Closing semaphore errror");
 
     int state = sem_unlink(SEM_NAME);
-    if (state != 0 && state != ENOENT) {
+    
+    if (state != 0 && errno != ENOENT) {
         ERROR_CHECK(-1, "Unlink semaphore error");
     }
 
