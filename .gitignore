@@ -4,5 +4,9 @@ view.out
 output.txt
 test/*
 satFiles/*
+*.cppout
+*.valout
+pvs.sh
+report.tasks
 .gitignore
 

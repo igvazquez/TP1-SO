@@ -119,6 +119,7 @@ int main(int argc, char const *argv[]) {
     }
     closeSharedMemory(shm_base, shm_size, shm_fd);
     closeFD(children, childrenCreated);
+    fclose(outputFile);
     ERROR_CHECK(sem_close(sem_id), "Closing semaphore error");
     
     int state = sem_unlink(SEM_NAME);
@@ -127,17 +128,6 @@ int main(int argc, char const *argv[]) {
     }   
     
     return 0;
-}
-
-int copyToShareMem(char *dest, const char *source) {
-    int i;
-    for (i = 0; source[i] != 0; i++) {
-        dest[i] = source[i];
-    }
-
-    dest[i] = 0;
-
-    return i + 1;
 }
 
 int writeOutput(char *output, FILE *outputFile, char *shm_ptr) {
@@ -151,7 +141,7 @@ int writeOutput(char *output, FILE *outputFile, char *shm_ptr) {
 }
 
 int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft) {
-    int i, id, pendings = 1;
+    int i, pendings = 1;
     char *initArgsArray[INITIAL_TASKS + 2];
 
     if (filesLeft > MAX_SLAVES * INITIAL_TASKS) {
@@ -168,6 +158,7 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
         if (pipe(pipeStoM) == -1)
             return 1;  //TODO: error managing
 
+        int id;
         if ((id = fork()) == -1) {
             return 2;  //TODO: error managing
         } else if (id == 0) {
@@ -196,11 +187,10 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
 }
 
 int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd) {
-    char buff[MAX_BUFFER_SIZE];
-    int len = 0;
 
     if (*filesRead < filesLeft) {
-        len = snprintf(buff, sizeof(buff), "%s", tasksRemaining[(*filesRead)++]);
+        char buff[MAX_BUFFER_SIZE];
+        int len = snprintf(buff, sizeof(buff), "%s", tasksRemaining[(*filesRead)++]);
         ERROR_CHECK(write(fd, buff, len + 1), "Master - assignTask Write");
         return 1;
     }

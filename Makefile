@@ -1,30 +1,33 @@
 CC = gcc
-CFLAGS = -pedantic -Wall -std=c99 -g
-CLIBS = -pthread -lrt
-
+CFLAGS = -pedantic -Wall -std=c99 -pthread -lrt -g
 RM = rm -f
 
 SOURCES = $(wildcard *.c)
 BINS = $(SOURCES:.c=.out)
 
-TEST = test/*
+CPPANS = $(SOURCES:.c=.cppout)	
+
+TF = test/sat/*
 
 all: $(BINS)
 
 %.out: %.c
-	$(CC) $(CFLAGS) $^ -o $@ $(CLIBS)
+	$(CC) $^ -o $@ $(CFLAGS)
 
-clean:
+clean: clean_check
 	$(RM) $(BINS)
 
-test: clean $(CPPANS) 
-	./pvs.sh
-	valgrind ./master.out $(TF) 2> master.valout | valgrind ./view.out 2> view.valout > /dev/null
-
-clean_test:
+clean_check:
 	$(RM) $(CPPANS) *.valout report.tasks
+
+check: clean $(CPPANS) 
+	./pvs.sh
+
+test: all $(CPPANS)
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=master.valout ./master.out $(TF) 2> master.valout | valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=view.valout ./view.out 2> view.valout > /dev/null
 
 %.cppout: %.c
 	cppcheck --quiet --enable=all --force --inconclusive  $^ 2> $@
 
-.PHONY: all clean test clean_test
+
+.PHONY: all clean check clean_check
