@@ -20,7 +20,7 @@ o tambien, en caso de tener un directorio con estos archivos puede:
 El programa envia por salida estandar la cantidad de tareas que tiene que resolver, y por ende, la cantidad de salidas que generará su ejecución. La salida 
 es utilizada por el proceso "view".
 
-Hay dos maneras de correr el programa
+Hay dos maneras de correr el programa:
 
 1. Pipear la salida del programa "master" al programa "view"  con el siguiente comando:
 
@@ -28,7 +28,8 @@ Hay dos maneras de correr el programa
 
 2. Correr los procesos en dos terminales:
 
-Terminal 1 
+Terminal 1
+
     ./master nombreDirectorio/*
     cantidadArchivos
 
@@ -38,9 +39,16 @@ Terminal 2
 
 Por ejemplo supongamos un directorio con 50 archivos .cnf llamado "satFiles"
 
-Luego debera:          Terminal 1                                               Terminal 2
-                        ./master satFiles/*                                     ./vista 50
-                        50
+Luego debera:
+
+Terminal 1
+
+    ./master satFiles/*
+    50
+
+Terminal 2
+
+    ./vista 50
 
 Para eliminar los archivos ejecutables basta con correr el comando:
 
