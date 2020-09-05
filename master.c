@@ -1,6 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #define SLAVE "./slave.out"
+#define _SVID_SOURCE 1
 #define _POSIX_C_SOURCE 200112L
 #define SEM_NAME "/IPC_Semaphore"
 #define NAME "/IPC_Information"
@@ -119,12 +120,12 @@ int main(int argc, char const *argv[]) {
     closeSharedMemory(shm_base, shm_size, shm_fd);
     closeFD(children, childrenCreated);
     ERROR_CHECK(sem_close(sem_id), "Closing semaphore error");
-    /*
+    
     int state = sem_unlink(SEM_NAME);
-    if(state != 0 && state != ENOENT){
+    if(state != 0 && errno != ENOENT){
         ERROR_CHECK(-1,"Unlink semaphore error");
     }   
-    */
+    
     return 0;
 }
 
