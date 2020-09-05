@@ -17,4 +17,14 @@ all: $(BINS)
 clean:
 	$(RM) $(BINS)
 
-.PHONY: all clean
+test: clean $(CPPANS) 
+	./pvs.sh
+	valgrind ./master.out $(TF) 2> master.valout | valgrind ./view.out 2> view.valout > /dev/null
+
+clean_test:
+	$(RM) $(CPPANS) *.valout report.tasks
+
+%.cppout: %.c
+	cppcheck --quiet --enable=all --force --inconclusive  $^ 2> $@
+
+.PHONY: all clean test clean_test
