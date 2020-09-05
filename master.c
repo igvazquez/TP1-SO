@@ -1,33 +1,37 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #define SLAVE "./slave.out"
+#define _POSIX_C_SOURCE 200112L
+#define NAME "/myInfo"
 #define MAX_SLAVES 5
+#define SIZE_FD 256
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 #define MAX_BUFFER_SIZE 200
 #define INITIAL_TASKS 2
 #define ERROR_CHECK(x, msg)                                                                              \
-    do                                                                                                   \
-    {                                                                                                    \
+    do {                                                                                                 \
         int retval = (x);                                                                                \
-        if (retval == -1)                                                                                \
-        {                                                                                                \
+        if (retval == -1) {                                                                              \
             fprintf(stderr, "Runtime error: %s returned %d at %s:%d\n", #x, retval, __FILE__, __LINE__); \
             perror(msg);                                                                                 \
             exit(-1);                                                                                    \
         }                                                                                                \
     } while (0)
 
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/select.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-typedef struct slave_t
-{
+typedef struct slave_t {
     pid_t pid;
     int fdIn;
     int fdOut;
@@ -37,25 +41,26 @@ typedef struct slave_t
 int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft);
 int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd);
 int worksProcessed(char *buffer);
-void replaceChar(char * buffer, char oldChar, char newChar);
-int createShareMemory();
+void replaceChar(char *buffer, char oldChar, char newChar);
+int createSharedMemory(int size, char ** shm_base);
+void closeSharedMemory(char * shm_base,int size,int shm_fd);
+void closeFD(slave_t children[], int childrensCreated);
 
-
-int main(int argc, char const *argv[])
-{
-    if (argc == 1)
-    {
+int main(int argc, char const *argv[]) {
+    if (argc == 1) {
         return 0;
     }
 
     int filesLeft = argc - 1;
-    int filesRead = 0, fdsAvailable = 0, tasksDone = 0,charsRead = 0;
-    char **tasksRemaining =(char **)argv + 1;
+    int filesRead = 0, fdsAvailable = 0, tasksDone = 0, charsRead = 0;
+    char **tasksRemaining = (char **)argv + 1;
+    char * shm_base;
+    char * ptr;
     slave_t children[MAX_SLAVES];
-
-    int fdShm = createShareMemory();
+    int shm_size = filesLeft * SIZE_FD;
+    int shm_fd = createSharedMemory(shm_size, &shm_base);
+    ptr = shm_base;
     //createSemaphore();
-    
 
     if (setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Master - Setvbuf");
@@ -64,40 +69,34 @@ int main(int argc, char const *argv[])
 
     fd_set fdSet;
     char buffer[250];
-    char * token;
-    char * delim = "\n";
+    char *token;
+    char *delim = "\n";
+    
 
-    while (tasksDone < filesLeft){
-
+    while (tasksDone < filesLeft) {
         FD_ZERO(&fdSet);
 
-        for (size_t i = 0; i < childrenCreated; i++)
-        {
+        for (size_t i = 0; i < childrenCreated; i++) {
             FD_SET(children[i].fdOut, &fdSet);
         }
         ERROR_CHECK(fdsAvailable = select(children[childrenCreated - 1].fdOut + 1, &fdSet, NULL, NULL, NULL), "Master - select");
-        for (int i = 0; i < childrenCreated && fdsAvailable > 0; i++){
-
-            if (FD_ISSET(children[i].fdOut, &fdSet)){
-
-                ERROR_CHECK(charsRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE - 1), "Master - read"); // Leer los outputs del slave
+        for (int i = 0; i < childrenCreated && fdsAvailable > 0; i++) {
+            if (FD_ISSET(children[i].fdOut, &fdSet)) {
+                ERROR_CHECK(charsRead = read(children[i].fdOut, buffer, MAX_BUFFER_SIZE - 1), "Master - read");  // Leer los outputs del slave
                 buffer[charsRead] = 0;
-                
-                if(charsRead){
-                    
-                    token = strtok(buffer,delim);
-                    while(token != NULL){
-                        replaceChar(token,'\t','\n');
-//                        printf("Output hijo %d: %s\n", i, token);
-                        printf("%s\n",token);
-  
+
+                if (charsRead) {
+                    token = strtok(buffer, delim);
+                    while (token != NULL) {
+                        replaceChar(token, '\t', '\n');
+                        // printf("%s\n", token);
+                        ptr += sprintf(ptr, "%s\n", token);
                         children[i].pending--;
                         tasksDone++;
-  //                      printf("tasksDone: %d\n", tasksDone);
-                        token = strtok(NULL,delim);
+                        token = strtok(NULL, delim);
                     }
 
-                    if(children[i].pending == 0){
+                    if (children[i].pending == 0) {
                         children[i].pending += assignTask(tasksRemaining, &filesRead, filesLeft, children[i].fdIn);
                     }
                 }
@@ -105,39 +104,33 @@ int main(int argc, char const *argv[])
             }
         }
     }
-
+    closeSharedMemory(shm_base, shm_size, shm_fd);
+    closeFD(children,childrenCreated);
+    printf("Number of files: %d", filesRead);
     return 0;
 }
 
-int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft)
-{
-
+int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft) {
     int i, id, pendings = 1;
     char *initArgsArray[INITIAL_TASKS + 2];
 
-    if (filesLeft > MAX_SLAVES * INITIAL_TASKS)
-    {
+    if (filesLeft > MAX_SLAVES * INITIAL_TASKS) {
         pendings = INITIAL_TASKS;
     }
 
-    for (i = 0; i < MAX_SLAVES && *filesRead < filesLeft; i++)
-    {
-
+    for (i = 0; i < MAX_SLAVES && *filesRead < filesLeft; i++) {
         int pipeMtoS[2];
         int pipeStoM[2];
 
         if (pipe(pipeMtoS) == -1)
-            return 1; //TODO: error managing
+            return 1;  //TODO: error managing
 
         if (pipe(pipeStoM) == -1)
-            return 1; //TODO: error managing
+            return 1;  //TODO: error managing
 
-        if ((id = fork()) == -1)
-        {
-            return 2; //TODO: error managing
-        }
-        else if (id == 0)
-        {
+        if ((id = fork()) == -1) {
+            return 2;  //TODO: error managing
+        } else if (id == 0) {
             ERROR_CHECK(close(pipeMtoS[PIPE_WRITE]), "Master - close pipeMtoS[WRITE]");
             ERROR_CHECK(close(pipeStoM[PIPE_READ]), "Master - close pipeStoM[READ]");
             ERROR_CHECK(dup2(pipeMtoS[PIPE_READ], STDIN_FILENO), "pipeMtoS dup2");
@@ -148,10 +141,8 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
             for (size_t j = 1; j <= pendings; j++)
                 initArgsArray[j] = tasksRemaining[(*filesRead)++];
             initArgsArray[pendings + 1] = NULL;
-            ERROR_CHECK(execv(SLAVE, initArgsArray), "Master - execv"); // Solo se ejecuta error_check si execv falla
-        }
-        else
-        {
+            ERROR_CHECK(execv(SLAVE, initArgsArray), "Master - execv");  // Solo se ejecuta error_check si execv falla
+        } else {
             *filesRead += pendings;
             children[i].pid = id;
             children[i].fdIn = pipeMtoS[PIPE_WRITE];
@@ -164,33 +155,54 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
     return i;
 }
 
-int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd)
-{
-
+int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd) {
     char buff[MAX_BUFFER_SIZE];
     int len = 0;
 
-    if (*filesRead < filesLeft)
-    {
-        len = snprintf(buff, sizeof(buff),"%s", tasksRemaining[(*filesRead)++]);
-        ERROR_CHECK(write(fd, buff, len+1), "Master - assignTask Write");
+    if (*filesRead < filesLeft) {
+        len = snprintf(buff, sizeof(buff), "%s", tasksRemaining[(*filesRead)++]);
+        ERROR_CHECK(write(fd, buff, len + 1), "Master - assignTask Write");
         return 1;
     }
 
     return 0;
 }
 
-int worksProcessed(char *buffer)
-{
+int worksProcessed(char *buffer) {
     return 0;
 }
 
-void replaceChar(char * buffer, char oldChar, char newChar){
-    char * aux;
+void replaceChar(char *buffer, char oldChar, char newChar) {
+    char *aux;
     while ((aux = strchr(buffer, oldChar)) != NULL)
         *aux = newChar;
 }
 
-int createShareMemory(){
+int createSharedMemory(int size, char ** shm_base) {
+    int shm_fd;
+    ERROR_CHECK((shm_fd = shm_open(NAME, O_CREAT | O_RDWR, 0666)), "Master - shm_open");
+
+    ERROR_CHECK(ftruncate(shm_fd, size), "Master - ftruncate");
+
+    *shm_base = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+
+    if (*shm_base == MAP_FAILED)
+        ERROR_CHECK(-1, "Master - mmap");
+
+    return shm_fd;
+}
+
+void closeSharedMemory(char * shm_base,int size,int shm_fd){
     
+    ERROR_CHECK(munmap(shm_base, size), "Master - munmap");
+
+    ERROR_CHECK(close(shm_fd), "Master - close shm");
+}
+
+void closeFD(slave_t children[], int childrensCreated){
+    for (int i = 0; i < childrensCreated; i++)
+    {
+        ERROR_CHECK(close(children[i].fdIn), "Master - close fdIn");
+        ERROR_CHECK(close(children[i].fdOut),"Master - close fdOut");
+    }
 }

@@ -26,6 +26,9 @@
 
 int main(int argc, char const *argv[]){
     
+    // int files = atoi(argv[1]);
+
+
     struct stat myStat;
     int shm_fd;
 
