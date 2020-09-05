@@ -1,5 +1,7 @@
 CC = gcc
-CFLAGS = -pedantic -Wall -std=c99 -pthread -lrt -g
+CFLAGS = -pedantic -Wall -std=c99 -g
+CLIBS = -pthread -lrt
+
 RM = rm -f
 
 SOURCES = $(wildcard *.c)
@@ -10,7 +12,7 @@ TEST = test/*
 all: $(BINS)
 
 %.out: %.c
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(CLIBS)
 
 clean:
 	$(RM) $(BINS)

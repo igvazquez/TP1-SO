@@ -2,7 +2,8 @@
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #define SLAVE "./slave.out"
 #define _POSIX_C_SOURCE 200112L
-#define NAME "/myInfo"
+#define SEM_NAME "/IPC_Semaphore"
+#define NAME "/IPC_Information"
 #define MAX_SLAVES 5
 #define SIZE_FD 256
 #define PIPE_READ 0
@@ -21,6 +22,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,11 +44,12 @@ int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, i
 int assignTask(char *tasksRemaining[], int *filesRead, int filesLeft, int fd);
 int worksProcessed(char *buffer);
 void replaceChar(char *buffer, char oldChar, char newChar);
-int createSharedMemory(int size, char ** shm_base);
-void closeSharedMemory(char * shm_base,int size,int shm_fd);
+int createSharedMemory(int size, char **shm_base);
+void closeSharedMemory(char *shm_base, int size, int shm_fd);
 void closeFD(slave_t children[], int childrensCreated);
+int copyToShareMem(char *dest, const char *source);
 
-int main(int argc, char const *argv[]) {
+    int main(int argc, char const *argv[]) {
     if (argc == 1) {
         return 0;
     }
@@ -54,13 +57,19 @@ int main(int argc, char const *argv[]) {
     int filesLeft = argc - 1;
     int filesRead = 0, fdsAvailable = 0, tasksDone = 0, charsRead = 0;
     char **tasksRemaining = (char **)argv + 1;
-    char * shm_base;
-    char * ptr;
+    char *shm_base;
+    char *ptr;
     slave_t children[MAX_SLAVES];
+
+    sem_t *sem_id = sem_open(SEM_NAME, O_CREAT, 0666, 0);
+
+    if (sem_id == SEM_FAILED) {
+        ERROR_CHECK(-1, "Semaphore creation failed");
+    }
+
     int shm_size = filesLeft * SIZE_FD;
     int shm_fd = createSharedMemory(shm_size, &shm_base);
     ptr = shm_base;
-    //createSemaphore();
 
     if (setvbuf(stdout, NULL, _IONBF, 0) != 0)
         ERROR_CHECK(-1, "Master - Setvbuf");
@@ -71,7 +80,6 @@ int main(int argc, char const *argv[]) {
     char buffer[250];
     char *token;
     char *delim = "\n";
-    
 
     while (tasksDone < filesLeft) {
         FD_ZERO(&fdSet);
@@ -89,10 +97,10 @@ int main(int argc, char const *argv[]) {
                     token = strtok(buffer, delim);
                     while (token != NULL) {
                         replaceChar(token, '\t', '\n');
-                        // printf("%s\n", token);
-                        ptr += sprintf(ptr, "%s\n", token);
+                        ptr += copyToShareMem(ptr, token);
                         children[i].pending--;
                         tasksDone++;
+                        sem_post(sem_id);
                         token = strtok(NULL, delim);
                     }
 
@@ -105,9 +113,27 @@ int main(int argc, char const *argv[]) {
         }
     }
     closeSharedMemory(shm_base, shm_size, shm_fd);
-    closeFD(children,childrenCreated);
+    closeFD(children, childrenCreated);
+  ERROR_CHECK(sem_close(sem_id),"Closing semaphore error");
+  /*
+    int state = sem_unlink(SEM_NAME);
+    if(state != 0 && state != ENOENT){
+        ERROR_CHECK(-1,"Unlink semaphore error");
+    }   
+    */
     printf("Number of files: %d", filesRead);
-    return 0;
+   return 0;
+}
+
+int copyToShareMem(char *dest, const char *source) {
+    int i;
+    for (i = 0; source[i] != 0; i++) {
+        dest[i] = source[i];
+    }
+
+    dest[i] = 0;
+
+    return i + 1;
 }
 
 int createChildren(slave_t children[], char *tasksRemaining[], int *filesRead, int filesLeft) {
@@ -178,7 +204,7 @@ void replaceChar(char *buffer, char oldChar, char newChar) {
         *aux = newChar;
 }
 
-int createSharedMemory(int size, char ** shm_base) {
+int createSharedMemory(int size, char **shm_base) {
     int shm_fd;
     ERROR_CHECK((shm_fd = shm_open(NAME, O_CREAT | O_RDWR, 0666)), "Master - shm_open");
 
@@ -192,17 +218,15 @@ int createSharedMemory(int size, char ** shm_base) {
     return shm_fd;
 }
 
-void closeSharedMemory(char * shm_base,int size,int shm_fd){
-    
+void closeSharedMemory(char *shm_base, int size, int shm_fd) {
     ERROR_CHECK(munmap(shm_base, size), "Master - munmap");
 
     ERROR_CHECK(close(shm_fd), "Master - close shm");
 }
 
-void closeFD(slave_t children[], int childrensCreated){
-    for (int i = 0; i < childrensCreated; i++)
-    {
+void closeFD(slave_t children[], int childrensCreated) {
+    for (int i = 0; i < childrensCreated; i++) {
         ERROR_CHECK(close(children[i].fdIn), "Master - close fdIn");
-        ERROR_CHECK(close(children[i].fdOut),"Master - close fdOut");
+        ERROR_CHECK(close(children[i].fdOut), "Master - close fdOut");
     }
 }
