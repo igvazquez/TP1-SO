@@ -1,7 +1,14 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #define _POSIX_C_SOURCE 2
-#define BUFFER_SIZE 2000
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BUFFER_SIZE 2048
 #define ERROR_CHECK(x, msg)                                                                              \
     do {                                                                                                 \
         int retval = (x);                                                                                \
@@ -11,12 +18,6 @@
             exit(-1);                                                                                    \
         }                                                                                                \
     } while (0)
-
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 void processTask(char *file);
 void replaceChar(char *buffer, char oldChar, char newChar);
@@ -31,10 +32,10 @@ int main(int argc, char const *argv[]) {
     for (size_t i = 1; i < argc; i++)
         processTask((char *)argv[i]);
 
-    while ((len = read(STDIN_FILENO, buffer, BUFFER_SIZE))) {
+    while ((len = read(STDIN_FILENO, buffer, BUFFER_SIZE - 1))) {
         if (len == -1)
             ERROR_CHECK(len, "Slave - read");
-
+        buffer[len] = 0;
         processTask(buffer);
     }
 
@@ -44,15 +45,17 @@ int main(int argc, char const *argv[]) {
 void processTask(char *file) {
     char cmd[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
-    int len = 0;
-    snprintf(cmd, sizeof(cmd), "minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file);
+
+    if (snprintf(cmd, sizeof(cmd), "minisat %s | grep -o -e \"Number of.*[0-9]\\+\" -e \"CPU time.*\" -e \".*SATISFIABLE\"", file) < 0)
+        ERROR_CHECK(-1, "Slave - snprintf");
+
     replaceChar(file, '\n', '\t');
 
     FILE *fp = popen(cmd, "r");
     if (fp == NULL)
         ERROR_CHECK(-1, "Slave - popen");
 
-    len += fread(buffer + len, sizeof(char), sizeof(buffer) - 1, fp);
+    int len = fread(buffer, sizeof(char), sizeof(buffer) - 1, fp);
     buffer[len] = 0;
 
     replaceChar(buffer, '\n', '\t');
