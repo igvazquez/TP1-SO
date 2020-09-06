@@ -1,6 +1,12 @@
 # TP1-SO
 TP1 IPCs Sistemas Operativos - 2020
 
+### Instalacion
+
+Asegurarse previamente antes de poder ejecutar el programa tener instalado minisat. Para instalarlo:
+
+    apt-get install minisat
+
 ### Compilacion
 
 Para poder compilar los archivos utilizar el comando:
@@ -17,8 +23,7 @@ o tambien, en caso de tener un directorio con estos archivos puede:
 
     ./master.out nombreDirectorio/*
 
-El programa envia por salida estandar la cantidad de tareas que tiene que resolver, y por ende, la cantidad de salidas que generará su ejecución. La salida 
-es utilizada por el proceso "view".
+El programa envia por salida estandar la cantidad de tareas que tiene que resolver, y por ende, la cantidad de salidas que generará su ejecución. La salida es utilizada por el proceso "view".
 
 Hay dos maneras de correr el programa:
 
@@ -56,10 +61,19 @@ Para eliminar los archivos ejecutables basta con correr el comando:
 
 ### Checkeo de memory leaks y testeo con Valgrind:
 
-Para realizar los checkeos con pvs-studio y cppcheck correr el comando:
+Para realizar los checkeos con pvs-studio y cppcheck, primero debe instalarlos con los comandos:
+
+    apt-get install pvs-studio
+    apt-get install cppcheck
+
+A continuacion puede realizar los chequeos con el comando:
 
     make check
 
-Si se desea correr algun caso de testeo con valgrind, se debe especificar dentro del makefile en la variable TF, el directorio donde se encuentran los archivos .cnf que se desean analizar y luego correr el comando:
+Si se desea correr algun caso de testeo con valgrind, se debe especificar dentro del makefile en la variable TF, el directorio donde se encuentran los archivos .cnf que se desean analizar. Asegurarse de contar con valgrind. Para instalarlo:
+
+    apt-get install valgrind
+
+Finalmente puede correr el comando:
 
     make test
