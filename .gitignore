@@ -5,8 +5,8 @@ output.txt
 test/*
 satFiles/*
 *.cppout
-*.valout
+master.valout
+view.valout
 pvs.sh
 report.tasks
 .gitignore
-

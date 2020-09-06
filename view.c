@@ -33,7 +33,7 @@ int main(int argc, char const *argv[]) {
     int filesToRead;
 
     if (argc <= 1) {
-        char filesToReadBuff[MAX_BUFF];
+        char filesToReadBuff[MAX_BUFF] = {0};
         ERROR_CHECK(read(STDIN_FILENO, filesToReadBuff, MAX_BUFF), "View - read stdin");
         filesToRead = atoi(filesToReadBuff);
     } else {
