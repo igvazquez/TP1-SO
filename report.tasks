@@ -1,2 +1,0 @@
-www.viva64.com/en/w	1	err	Help: The documentation for all analyzer warnings is available here: https://www.viva64.com/en/w/.
-/mnt/c/Users/Ignacio Vazquez/Desktop/New folder/SO/TP1-SO/master.c	98	warn	V557 Array underrun is possible. The value of 'charsRead' index could reach -1.
